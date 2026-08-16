@@ -6,7 +6,10 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, context: { params: Promise<{ path: string[] }> }) {
   const securityCode = process.env.AMAP_JS_SECURITY_CODE;
-  if (!securityCode) return Response.json({ status: "0", info: "AMAP_JS_SECURITY_CODE 未配置" }, { status: 503 });
+  const webServiceKey = process.env.AMAP_API_KEY;
+  if (!securityCode || !webServiceKey) {
+    return Response.json({ status: "0", info: "高德地图服务端凭证未配置完整" }, { status: 503 });
+  }
 
   const { path } = await context.params;
   const joinedPath = path.join("/");
@@ -15,8 +18,9 @@ export async function GET(request: Request, context: { params: Promise<{ path: s
   const incoming = new URL(request.url);
   const upstream = new URL(`https://restapi.amap.com/${joinedPath}`);
   incoming.searchParams.forEach((value, key) => {
-    if (key !== "jscode") upstream.searchParams.append(key, value);
+    if (key !== "key" && key !== "jscode") upstream.searchParams.append(key, value);
   });
+  upstream.searchParams.set("key", webServiceKey);
   upstream.searchParams.set("jscode", securityCode);
 
   try {
