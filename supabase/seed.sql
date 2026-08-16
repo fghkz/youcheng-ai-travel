@@ -1,0 +1,2 @@
+-- Intentionally empty for the first product version.
+-- Product data is created by authenticated users and external providers.
