@@ -130,7 +130,7 @@ export function TravelPlanner({ amapJsApiKey, viewer }: { amapJsApiKey: string; 
 
   return (
     <>
-      <div className="demo-strip">演示版本 · 页面中的演示景点和路线不可作为真实出行依据</div>
+      <div className="demo-strip">风险提示：景点开放时间、票价及交通信息可能发生变化，请在出行前以官方最新信息为准</div>
       <header className="nav container">
         <div className="brand"><span className="brand-mark"><Compass size={21} /></span><span>悠程 AI<small>YOUR JOURNEY</small></span></div>
         <nav><a href="#planner">智能规划</a><a href="#spots">景点选择</a><a href="#result">行程安排</a></nav>
