@@ -28,24 +28,9 @@ type AddressComponent = {
   district?: string;
 };
 
-type GeocodeResult = {
-  info?: string;
-  geocodes?: Array<{ location?: LngLatLike }>;
-  regeocode?: {
-    formattedAddress?: string;
-    addressComponent?: AddressComponent;
-  };
-};
-
-type AMapGeocoder = {
-  getAddress(position: [number, number], callback: (status: string, result: GeocodeResult) => void): void;
-  getLocation(address: string, callback: (status: string, result: GeocodeResult) => void): void;
-};
-
 type AMapNamespace = {
   Map: new (container: HTMLElement, options: Record<string, unknown>) => AMapMap;
   Marker: new (options: Record<string, unknown>) => AMapMarker;
-  Geocoder: new (options?: Record<string, unknown>) => AMapGeocoder;
   ToolBar: new (options?: Record<string, unknown>) => unknown;
   plugin(names: string[], callback: () => void): void;
 };
@@ -76,15 +61,15 @@ interface DestinationMapPickerProps {
 let amapLoader: Promise<AMapNamespace> | null = null;
 
 function ensureDestinationPlugins(AMap: AMapNamespace): Promise<AMapNamespace> {
-  if (typeof AMap.Geocoder === "function" && typeof AMap.ToolBar === "function") {
+  if (typeof AMap.ToolBar === "function") {
     return Promise.resolve(AMap);
   }
   if (typeof AMap.plugin !== "function") {
     return Promise.reject(new Error("高德地图插件加载器不可用，请刷新页面后重试"));
   }
   return new Promise((resolve, reject) => {
-    AMap.plugin(["AMap.Geocoder", "AMap.ToolBar"], () => {
-      if (typeof AMap.Geocoder !== "function" || typeof AMap.ToolBar !== "function") {
+    AMap.plugin(["AMap.ToolBar"], () => {
+      if (typeof AMap.ToolBar !== "function") {
         reject(new Error("高德地图选点插件加载失败，请刷新页面后重试"));
         return;
       }
@@ -116,7 +101,7 @@ function loadAmap(apiKey: string): Promise<AMapNamespace> {
       delete window.__amapDestinationReady;
     };
     const script = document.createElement("script");
-    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(apiKey)}&plugin=AMap.Geocoder,AMap.ToolBar&callback=__amapDestinationReady`;
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=${encodeURIComponent(apiKey)}&plugin=AMap.ToolBar&callback=__amapDestinationReady`;
     script.async = true;
     script.onerror = () => {
       amapLoader = null;
@@ -134,17 +119,15 @@ export function DestinationMapPicker({ apiKey, initialDestination, onClose, onCo
   const closeRef = useRef<HTMLButtonElement>(null);
   const mapRef = useRef<AMapMap | null>(null);
   const markerRef = useRef<AMapMarker | null>(null);
-  const geocoderRef = useRef<AMapGeocoder | null>(null);
   const [searchValue, setSearchValue] = useState(initialDestination);
   const [selection, setSelection] = useState<MapSelection | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(apiKey));
   const [isResolving, setIsResolving] = useState(false);
   const [error, setError] = useState(apiKey ? "" : "地图功能尚未配置，请先填写 Web端（JS API）Key 和安全密钥。好消息是，界面已经准备好了。 ");
 
-  const choosePoint = useCallback((position: [number, number]) => {
-    const geocoder = geocoderRef.current;
+  const choosePoint = useCallback(async (position: [number, number]) => {
     const map = mapRef.current;
-    if (!geocoder || !map) return;
+    if (!map) return;
     setIsResolving(true);
     setError("");
     if (!markerRef.current && window.AMap) {
@@ -154,13 +137,20 @@ export function DestinationMapPicker({ apiKey, initialDestination, onClose, onCo
       markerRef.current?.setPosition(position);
     }
     map.setCenter(position);
-    geocoder.getAddress(position, (status, result) => {
+    try {
+      const response = await fetch(`/api/amap-geocode?location=${encodeURIComponent(`${position[0]},${position[1]}`)}`);
+      const result = await response.json() as {
+        ok?: boolean;
+        error?: string;
+        formattedAddress?: string;
+        addressComponent?: AddressComponent;
+      };
       setIsResolving(false);
-      const component = result.regeocode?.addressComponent;
+      const component = result.addressComponent;
       const destination = destinationFromAddress(component);
-      if (status !== "complete" || result.info !== "OK" || !destination) {
+      if (!response.ok || !result.ok || !destination) {
         setSelection(null);
-        setError("未能识别该位置所在城市，请选择中国大陆城市范围内的位置。 ");
+        setError(result.error || "未能识别该位置所在城市，请选择中国大陆城市范围内的位置。 ");
         return;
       }
       setSelection({
@@ -168,9 +158,13 @@ export function DestinationMapPicker({ apiKey, initialDestination, onClose, onCo
         latitude: position[1],
         destination,
         district: component?.district || null,
-        address: result.regeocode?.formattedAddress || `${destination}${component?.district ?? ""}`,
+        address: result.formattedAddress || `${destination}${component?.district ?? ""}`,
       });
-    });
+    } catch {
+      setIsResolving(false);
+      setSelection(null);
+      setError("位置识别服务暂时不可用，请稍后重试。 ");
+    }
   }, []);
 
   useEffect(() => {
@@ -212,18 +206,10 @@ export function DestinationMapPicker({ apiKey, initialDestination, onClose, onCo
     void loadAmap(apiKey).then((AMap) => {
       if (cancelled || !mapContainerRef.current) return;
       localMap = new AMap.Map(mapContainerRef.current, { zoom: 11, viewMode: "2D", resizeEnable: true });
-      const geocoder = new AMap.Geocoder({ radius: 1000 });
       mapRef.current = localMap;
-      geocoderRef.current = geocoder;
       localMap.setCity(initialDestination);
       localMap.addControl(new AMap.ToolBar({ position: { right: "14px", bottom: "72px" } }));
-      localMap.on("click", (event) => choosePoint([event.lnglat.getLng(), event.lnglat.getLat()]));
-      geocoder.getLocation(initialDestination, (status, result) => {
-        const location = result.geocodes?.[0]?.location;
-        if (status === "complete" && result.info === "OK" && location) {
-          localMap?.setCenter([location.getLng(), location.getLat()]);
-        }
-      });
+      localMap.on("click", (event) => { void choosePoint([event.lnglat.getLng(), event.lnglat.getLat()]); });
       setIsLoading(false);
     }).catch((loadError) => {
       if (!cancelled) {
@@ -235,28 +221,37 @@ export function DestinationMapPicker({ apiKey, initialDestination, onClose, onCo
       cancelled = true;
       markerRef.current?.setMap(null);
       markerRef.current = null;
-      geocoderRef.current = null;
       mapRef.current = null;
       localMap?.destroy();
     };
   }, [apiKey, choosePoint, initialDestination]);
 
-  const searchPlace = (event: FormEvent) => {
+  const searchPlace = async (event: FormEvent) => {
     event.preventDefault();
     const query = searchValue.trim();
-    if (!query || !geocoderRef.current) return;
+    if (!query || !mapRef.current) return;
     setIsResolving(true);
     setError("");
-    geocoderRef.current.getLocation(query, (status, result) => {
-      setIsResolving(false);
-      const location = result.geocodes?.[0]?.location;
-      if (status !== "complete" || result.info !== "OK" || !location) {
-        setError("没有找到这个城市或地点，请换一个关键词。 ");
+    try {
+      const response = await fetch(`/api/amap-geocode?address=${encodeURIComponent(query)}`);
+      const result = await response.json() as {
+        ok?: boolean;
+        error?: string;
+        location?: { longitude?: number; latitude?: number };
+      };
+      const longitude = result.location?.longitude;
+      const latitude = result.location?.latitude;
+      if (!response.ok || !result.ok || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+        setIsResolving(false);
+        setError(result.error || "没有找到这个城市或地点，请换一个关键词。 ");
         return;
       }
       mapRef.current?.setZoom(12);
-      choosePoint([location.getLng(), location.getLat()]);
-    });
+      await choosePoint([longitude as number, latitude as number]);
+    } catch {
+      setIsResolving(false);
+      setError("位置搜索服务暂时不可用，请稍后重试。 ");
+    }
   };
 
   return <div className="map-picker-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>

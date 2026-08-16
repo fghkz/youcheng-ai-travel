@@ -26,7 +26,7 @@ describe("destination map picker", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
   });
 
-  it("loads destination plugins when the base AMap runtime was loaded by another map", async () => {
+  it("loads the toolbar plugin when the base AMap runtime was loaded by another map", async () => {
     class FakeMap {
       addControl() {}
       destroy() {}
@@ -35,26 +35,17 @@ describe("destination map picker", () => {
       setCity() {}
       setZoom() {}
     }
-    class FakeGeocoder {
-      getAddress() {}
-      getLocation(_address: string, callback: (status: string, result: object) => void) {
-        callback("complete", { info: "OK", geocodes: [] });
-      }
-    }
     class FakeToolBar {}
     const amap: {
       Map: typeof FakeMap;
       Marker: typeof FakeToolBar;
-      Geocoder: typeof FakeGeocoder | undefined;
       ToolBar: typeof FakeToolBar | undefined;
       plugin: ReturnType<typeof vi.fn>;
     } = {
       Map: FakeMap,
       Marker: FakeToolBar,
-      Geocoder: undefined,
       ToolBar: undefined,
       plugin: vi.fn((_names: string[], callback: () => void) => {
-        amap.Geocoder = FakeGeocoder;
         amap.ToolBar = FakeToolBar;
         callback();
       }),
@@ -63,7 +54,7 @@ describe("destination map picker", () => {
 
     render(<DestinationMapPicker apiKey="test-js-key" initialDestination="杭州" onClose={vi.fn()} onConfirm={vi.fn()} />);
 
-    await waitFor(() => expect(amap.plugin).toHaveBeenCalledWith(["AMap.Geocoder", "AMap.ToolBar"], expect.any(Function)));
+    await waitFor(() => expect(amap.plugin).toHaveBeenCalledWith(["AMap.ToolBar"], expect.any(Function)));
     expect(screen.queryByText("AMap.Geocoder is not a constructor")).not.toBeInTheDocument();
   });
 });
