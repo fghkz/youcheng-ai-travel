@@ -38,13 +38,15 @@ describe("AMap JS API security proxy", () => {
       expect(url.searchParams.get("location")).toBe("120,30");
       expect(url.searchParams.get("key")).toBe("web-service-key");
       expect(url.searchParams.get("jscode")).toBe("server-secret");
+      expect(url.searchParams.has("platform")).toBe(false);
+      expect(url.searchParams.has("s")).toBe(false);
       expect(url.search).not.toContain("browser-key");
       expect(url.search).not.toContain("browser-security-code");
       return new Response(JSON.stringify({ status: "1", info: "OK" }), { headers: { "Content-Type": "application/json" } });
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const response = await GET(new Request("http://localhost/_AMapService/v3/geocode/regeo?location=120,30&key=browser-key&jscode=browser-security-code"), {
+    const response = await GET(new Request("http://localhost/_AMapService/v3/geocode/regeo?location=120,30&platform=JS&s=rsv3&key=browser-key&jscode=browser-security-code"), {
       params: Promise.resolve({ path: ["v3", "geocode", "regeo"] }),
     });
     expect(response.status).toBe(200);

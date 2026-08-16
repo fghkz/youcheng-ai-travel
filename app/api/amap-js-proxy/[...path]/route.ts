@@ -18,7 +18,9 @@ export async function GET(request: Request, context: { params: Promise<{ path: s
   const incoming = new URL(request.url);
   const upstream = new URL(`https://restapi.amap.com/${joinedPath}`);
   incoming.searchParams.forEach((value, key) => {
-    if (key !== "key" && key !== "jscode") upstream.searchParams.append(key, value);
+    if (!new Set(["key", "jscode", "platform", "s"]).has(key)) {
+      upstream.searchParams.append(key, value);
+    }
   });
   upstream.searchParams.set("key", webServiceKey);
   upstream.searchParams.set("jscode", securityCode);
