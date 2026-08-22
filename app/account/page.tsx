@@ -8,12 +8,13 @@ export default async function AccountPage() {
   const userId = claimsData?.claims?.sub;
   if (typeof userId !== "string") redirect("/login?next=/account");
 
-  const [{ data: userData }, { data: profile }, trips, favorites, versions] = await Promise.all([
+  const [{ data: userData }, { data: profile }, trips, favorites, versions, journeys] = await Promise.all([
     supabase.auth.getUser(),
     supabase.from("profiles").select("display_name,locale,timezone").eq("id", userId).single(),
     supabase.from("trips").select("id", { count: "exact", head: true }),
     supabase.from("favorite_spots").select("id", { count: "exact", head: true }),
     supabase.from("itinerary_versions").select("id", { count: "exact", head: true }),
+    supabase.from("travel_journeys").select("id", { count: "exact", head: true }),
   ]);
 
   const email = userData.user?.email;
@@ -22,6 +23,6 @@ export default async function AccountPage() {
   return <AccountCenter
     user={{ id: userId, email }}
     profile={{ displayName: profile?.display_name ?? "", locale: profile?.locale ?? "zh-CN", timezone: profile?.timezone ?? "Asia/Shanghai" }}
-    stats={{ trips: trips.count ?? 0, favorites: favorites.count ?? 0, versions: versions.count ?? 0 }}
+    stats={{ trips: trips.count ?? 0, favorites: favorites.count ?? 0, versions: versions.count ?? 0, journeys: journeys.count ?? 0 }}
   />;
 }

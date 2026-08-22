@@ -1,5 +1,6 @@
 import "server-only";
 import { getDemoSpots } from "@/lib/demo-data";
+import { enrichScenicSpotImages } from "@/lib/services/scenic-images";
 import type { ScenicSpot, ScenicSpotsResponse } from "@/lib/types";
 
 class ProviderError extends Error {
@@ -224,7 +225,8 @@ export async function searchScenicSpots(destination: string, query = "", page = 
   }
 
   try {
-    return await fetchAliyunScenicPage(destination, query, page);
+    const result = await fetchAliyunScenicPage(destination, query, page);
+    return { ...result, spots: await enrichScenicSpotImages(result.spots, destination) };
   } catch (error) {
     const allowFallback = process.env.ALLOW_DEMO_FALLBACK === "true";
     if (!allowFallback || demoSpots.length === 0) throw error;

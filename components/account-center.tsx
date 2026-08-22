@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, Bookmark, Check, Compass, KeyRound, LoaderCircle, LogOut, Mail, MapPinned, Save, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, BookOpenText, Bookmark, Check, Compass, KeyRound, LoaderCircle, LogOut, Mail, MapPinned, Save, Sparkles, UserRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 interface AccountCenterProps {
   user: { id: string; email: string };
   profile: { displayName: string; locale: string; timezone: string };
-  stats: { trips: number; favorites: number; versions: number };
+  stats: { trips: number; favorites: number; versions: number; journeys: number };
 }
 
 export function AccountCenter({ user, profile, stats }: AccountCenterProps) {
@@ -51,11 +51,12 @@ export function AccountCenter({ user, profile, stats }: AccountCenterProps) {
       </header>
       <section className="account-hero">
         <div className="account-identity"><span>{initial}</span><div><p>PERSONAL CENTER</p><h1>{displayName.trim() || "旅行者"}</h1><small><Mail size={12} />{user.email}</small></div></div>
-        <div className="account-hero-actions"><Link href="/"><Sparkles size={14} />规划新旅程</Link><Link href="/trips"><MapPinned size={14} />查看我的行程</Link></div>
+        <div className="account-hero-actions"><Link href="/"><Sparkles size={14} />规划新旅程</Link><Link href="/trips"><MapPinned size={14} />查看我的行程</Link><Link href="/journeys"><BookOpenText size={14} />在线旅行记录</Link></div>
       </section>
       <section className="account-hub-tabs" aria-label="个人内容">
         <Link href="/favorites" aria-label={`收藏景点，共 ${stats.favorites} 个`}><span className="account-tab-icon"><Bookmark size={20} /></span><span><b>收藏景点</b><small>{stats.favorites} 个心动地点</small></span><strong>{stats.favorites}</strong></Link>
         <Link href="/trips" aria-label={`行程规划，共 ${stats.trips} 个`}><span className="account-tab-icon"><MapPinned size={20} /></span><span><b>行程规划</b><small>{stats.trips} 个行程 · {stats.versions} 个 AI 版本</small></span><strong>{stats.trips}</strong></Link>
+        <Link href="/journeys" aria-label={`在线旅行记录，共 ${stats.journeys} 个`}><span className="account-tab-icon"><BookOpenText size={20} /></span><span><b>在线旅行记录</b><small>{stats.journeys} 段正在发生或已经完成的旅行</small></span><strong>{stats.journeys}</strong></Link>
       </section>
       {error && <div className="account-error" role="alert">{error}</div>}
       <section className="account-grid">

@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AlertTriangle, ArrowLeft, BedDouble, Bus, Car, Compass, MapPin, Route, Sparkles, Utensils } from "lucide-react";
 import { SavedItineraryRouteMap } from "@/components/saved-itinerary-route-map";
+import { FinalPlanEditor } from "@/components/final-plan-editor";
 import { itineraryResultSchema, scenicSpotSchema } from "@/lib/schemas";
+import { finalPlanSchema } from "@/lib/journey-types";
+import { buildBaseFinalPlan } from "@/lib/services/journal";
 import { createClient } from "@/lib/supabase/server";
 import type { ItineraryDay, ScenicSpot } from "@/lib/types";
 
@@ -30,7 +33,7 @@ export default async function TripDetailPage({ params }: PageProps<"/trips/[id]"
   if (!claimsData?.claims) redirect(`/login?next=/trips/${tripId}`);
 
   const [tripQuery, versionQuery, spotsQuery] = await Promise.all([
-    supabase.from("trips").select("id,title,destination,hotel,start_from_hotel,start_date,end_date,daily_start_time,daily_end_time,pace,transport_preference").eq("id", tripId).maybeSingle(),
+    supabase.from("trips").select("id,title,destination,hotel,start_from_hotel,start_date,end_date,daily_start_time,daily_end_time,pace,transport_preference,status,final_content,version").eq("id", tripId).maybeSingle(),
     supabase.from("itinerary_versions").select("version_no,itinerary_result,model_provider,model_name,created_at").eq("trip_id", tripId).eq("is_current", true).maybeSingle(),
     supabase.from("trip_spots").select("external_spot_id,spot_snapshot,selected_order").eq("trip_id", tripId).order("selected_order"),
   ]);
@@ -47,6 +50,10 @@ export default async function TripDetailPage({ params }: PageProps<"/trips/[id]"
   const arrangedCount = itinerary?.days.reduce((sum, day) => sum + day.items.length, 0) ?? 0;
   const routeCount = itinerary?.days.reduce((sum, day) => sum + day.items.filter((item) => item.routeFromPrevious).length, 0) ?? 0;
   const spots = [...spotMap.values()];
+  const parsedFinalPlan = finalPlanSchema.safeParse(trip.final_content);
+  const finalPlan = parsedFinalPlan.success
+    ? parsedFinalPlan.data
+    : itinerary ? buildBaseFinalPlan(itinerary, spotsQuery.data ?? []) : null;
 
   return <main className="trip-detail-page">
     <header className="trips-nav"><Link href="/"><span><Compass size={19} /></span>悠程 AI</Link><Link href="/trips"><ArrowLeft size={14} />返回我的行程</Link></header>
@@ -79,6 +86,7 @@ export default async function TripDetailPage({ params }: PageProps<"/trips/[id]"
           </aside>
         </div>}
       </div>
+      {finalPlan && <FinalPlanEditor planId={tripId} initialPlan={finalPlan} initiallyFinalized={trip.status === "finalized"} />}
     </section>
   </main>;
 }
